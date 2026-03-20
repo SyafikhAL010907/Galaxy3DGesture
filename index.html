@@ -39,6 +39,7 @@
         #start-btn { padding: 25px 70px; font-size: 1.8rem; background: none; color: #ffffff; border: 3px solid #7dd3fc; border-radius: 60px; cursor: pointer; box-shadow: 0 0 25px #d8b4fe; letter-spacing: 8px; transition: 0.4s; }
         #start-btn:hover { background: #fff; color: #000; box-shadow: 0 0 60px #ffffff; }
 
+        /* KAMERA JERNIH TANPA BLUR */
         #video-bg { 
             position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; 
             object-fit: cover; z-index: 1; transform: scaleX(-1); 
@@ -121,7 +122,7 @@
         let currentHandLandmarks = [];
 
         // ==========================================
-        // 2. PHYSICS ENGINE
+        // 2. PHYSICS ENGINE (BENCHMARK VERSION)
         // ==========================================
         class Particle {
             constructor() { this.init(); this.x = Math.random()*width; this.y = Math.random()*height; }
@@ -215,14 +216,19 @@
         initParticles();
 
         // ==========================================
-        // 3. AI & EXCLUSIVE SHAPE DETECTION
+        // 3. AI & EXCLUSIVE SHAPE DETECTION (STABLE)
         // ==========================================
         const lirikEl = document.getElementById('lyrics-text'), uiLayer = document.getElementById('ui-layer');
         const statusBox = document.getElementById('status-box');
         let stableFingers = 5, heartHold = 0, votes = [];
 
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.3, minTrackingConfidence: 0.6 });
+        hands.setOptions({ 
+            maxNumHands: 2, 
+            modelComplexity: 1, 
+            minDetectionConfidence: 0.28, // GERCEP DETEKSI TANGAN BARU
+            minTrackingConfidence: 0.6 
+        });
         
         hands.onResults((res) => {
             currentHandLandmarks = res.multiHandLandmarks || [];
@@ -233,6 +239,8 @@
             let rawF = 0, isSwanNeck = false;
             const h0 = currentHandLandmarks[0];
             if(h0 && h0[8]){ pointerX = (1-h0[8].x)*width; pointerY = h0[8].y*height; }
+            
+            // DETEKSI KHUSUS SWAN NECK (EXCLUSEIVE)
             if(currentHandLandmarks.length === 2){
                 const h1 = currentHandLandmarks[0], h2 = currentHandLandmarks[1];
                 const dWrist = Math.hypot(h1[0].x - h2[0].x, h1[0].y - h2[0].y); 
@@ -242,8 +250,11 @@
                 if(dWrist < 0.55 && dIndex < 0.22 && h1Closed && h2Closed && h1[8].y < h1[0].y) isSwanNeck = true;
             }
             if(isSwanNeck) heartHold++; else heartHold = Math.max(0, heartHold - 2);
-            if(heartHold > 8){ currentMode = 'SECRET_HEART'; uiLayer.classList.add('show'); statusBox.innerHTML = "💎 DREAMY LOVE ACTIVE ❤️"; }
-            else {
+            
+            if(heartHold > 8){ 
+                currentMode = 'SECRET_HEART'; uiLayer.classList.add('show'); 
+                statusBox.innerHTML = "💎 DREAMY LOVE ACTIVE ❤️"; 
+            } else {
                 uiLayer.classList.remove('show');
                 currentHandLandmarks.forEach((lm, i) => {
                     const side = res.multiHandedness[i] ? res.multiHandedness[i].label : "Right";
@@ -289,6 +300,7 @@
             const centerX = width / 2;
             const centerY = height / 2;
 
+            // DRAW BLACK HOLE GLOW (BELAKANG)
             if(currentMode === 'BLACK_HOLE'){
                 let diskGlow = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 230);
                 diskGlow.addColorStop(0, 'rgba(125, 211, 252, 0.2)');
@@ -300,25 +312,23 @@
 
             particles.forEach(p => { p.update(Date.now()*0.001, currentMode); p.draw(currentMode); });
 
-            // MODIFIKASI: GRADASI BOLA HITAM (SINGULARITY)
+            // DRAW BLACK HOLE EVENT HORIZON (SINGULARITY DENGAN GRADASI)
             if(currentMode === 'BLACK_HOLE'){
-                // Outer Blur/Gradasi Singularity biar gak kaku
                 let singGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 70);
-                singGrad.addColorStop(0, '#000000');     // Inti Paling Hitam
-                singGrad.addColorStop(0.8, '#000000');   // Masih Hitam Pekat
-                singGrad.addColorStop(1, 'rgba(20, 0, 40, 0)'); // Fading ke transparan di pinggir
-                
+                singGrad.addColorStop(0, '#000000');
+                singGrad.addColorStop(0.8, '#000000');
+                singGrad.addColorStop(1, 'rgba(20, 0, 40, 0)'); 
                 ctx.fillStyle = singGrad;
                 ctx.beginPath(); ctx.arc(centerX, centerY, 72, 0, Math.PI*2); ctx.fill();
                 
-                // Ring Inner White Glow (Pusat Accretion)
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)'; ctx.lineWidth = 1.5;
                 ctx.beginPath(); ctx.ellipse(centerX, centerY, 80, 28, 0, 0, Math.PI*2); ctx.stroke();
             }
 
+            // DRAW SKELETONS (2 TANGAN)
             if (currentHandLandmarks.length > 0) {
                 currentHandLandmarks.forEach((lm, idx) => {
-                    ctx.strokeStyle = idx === 0 ? 'rgba(255, 255, 255, 0.25)' : 'rgba(216, 180, 254, 0.25)'; 
+                    ctx.strokeStyle = idx === 0 ? 'rgba(255, 255, 255, 0.35)' : 'rgba(216, 180, 254, 0.35)'; 
                     ctx.lineWidth = 2.5;
                     const c = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
                     c.forEach(n => { ctx.beginPath(); ctx.moveTo((1-lm[n[0]].x)*width, lm[n[0]].y*height); ctx.lineTo((1-lm[n[1]].x)*width, lm[n[1]].y*height); ctx.stroke(); });
