@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universe Control Pro - Antigravity Edition</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #010005; 
+            color: white; 
+            font-family: 'Segoe UI', sans-serif; 
+        }
+        
+        canvas { 
+            display: block; 
+            width: 100vw; 
+            height: 100vh; 
+            position: relative;
+            z-index: 5;
+        }
+
+        /* LIRIK STYLING */
+        #lyrics-container {
+            position: absolute;
+            bottom: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            text-align: center;
+            width: 90%;
+            pointer-events: none;
+        }
+
+        #lyrics-text {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #ffffff;
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+            transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(30px) scale(0.7);
+        }
+
+        #lyrics-text.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            animation: lyric-float 2s infinite alternate;
+        }
+
+        @keyframes lyric-float {
+            from { text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff; transform: translateY(0); }
+            to { text-shadow: 0 0 20px #ff007f, 0 0 40px #ff007f; transform: translateY(-5px); }
+        }
+
+        /* UI LAYER */
+        #ui-layer { 
+            position: absolute; 
+            top: 40%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            text-align: center; 
+            pointer-events: none; 
+            z-index: 10; 
+            opacity: 0; 
+            transition: opacity 2s ease; 
+            width: 90%;
+        }
+        #ui-layer.show { opacity: 1; }
+        h1 { font-size: 3.5rem; margin: 0; text-shadow: 0 0 30px #ff007f; letter-spacing: 5px; }
+
+        /* OVERLAY START */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, #05001a 0%, #000 100%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        #start-btn {
+            padding: 25px 70px;
+            font-size: 1.8rem;
+            background: none;
+            color: #00ffff;
+            border: 3px solid #00ffff;
+            border-radius: 60px;
+            cursor: pointer;
+            box-shadow: 0 0 25px #00ffff;
+            letter-spacing: 8px;
+            transition: 0.4s;
+            text-transform: uppercase;
+        }
+        #start-btn:hover { background: #00ffff; color: #000; box-shadow: 0 0 60px #00ffff; transform: scale(1.05); }
+
+        /* Video Layers */
+        #video-bg { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; transform: scaleX(-1); opacity: 0.3; filter: blur(18px); }
+        #video-focus { 
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 100vw; height: 100vh; 
+            object-fit: cover; 
+            z-index: 2; 
+            transform: scaleX(-1); 
+            opacity: 0.7; 
+            /* FIX WARNING VS CODE: Added standard mask-image */
+            -webkit-mask-image: radial-gradient(circle, black 30%, transparent 85%); 
+            mask-image: radial-gradient(circle, black 30%, transparent 85%); 
+        }
+
+        #status-box {
+            position: absolute; top: 20px; left: 20px; z-index: 25;
+            background: rgba(0,0,0,0.85); padding: 12px 24px; border: 2px solid #ffeb3b;
+            color: #ffeb3b; font-family: monospace; border-radius: 12px; font-size: 1rem;
+        }
+
+        #yt-player-container { position: absolute; top: -1000px; left: -1000px; width: 1px; height: 1px; overflow: hidden; }
+    </style>
+</head>
+<body>
+
+    <div id="overlay">
+        <h1 style="color: #fff; margin-bottom: 20px; letter-spacing: 10px;">ANTIGRAVITY</h1>
+        <button id="start-btn">AWALI SEMESTA ✨</button>
+        <p style="color: #666; margin-top: 20px; font-style: italic;">Lagu: Iris - Goo Goo Dolls</p>
+    </div>
+
+    <div id="status-box">Menyiapkan Gravitasi...</div>
+    
+    <div id="ui-layer">
+        <h1>REVANI KHOIRUNNISA AZZAHRA</h1>
+        <p style="font-size: 1.8rem; color: #00ffff; font-style: italic; margin-top: 10px;">"Hii, Cantikk IloveYou Ya Kita Sama Sama Terus Okay??" ✨❤️</p>
+    </div>
+
+    <div id="lyrics-container">
+        <div id="lyrics-text">... Semesta Siap Dimulai ...</div>
+    </div>
+
+    <div id="yt-player-container"><div id="yt-player"></div></div>
+
+    <video id="video-bg" autoplay playsinline muted></video>
+    <video id="video-focus" autoplay playsinline muted></video>
+    
+    <canvas id="canvas"></canvas>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+
+    <script>
+        // ==========================================
+        // 1. DATA LIRIK
+        // ==========================================
+        const lyricsData = [
+            { t: 0, text: "Iris - Goo Goo Dolls" },
+            { t: 14, text: "And I'd give up forever to touch you" },
+            { t: 21, text: "Cause I know that you feel me somehow" },
+            { t: 28, text: "You're the closest to heaven that I'll ever be" },
+            { t: 34, text: "And I don't want to go home right now" },
+            { t: 42, text: "And all I can taste is this moment" },
+            { t: 49, text: "And all I can breathe is your life" },
+            { t: 56, text: "And sooner or later, it's over" },
+            { t: 62, text: "I just don't wanna miss you tonight" },
+            { t: 69, text: "And I don't want the world to see me" },
+            { t: 73, text: "Cause I don't think that they'd understand" },
+            { t: 83, text: "When everything's made to be broken" },
+            { t: 87, text: "I just want you to know who I am" },
+            { t: 98, text: "You can't fight the tears that ain't coming" },
+            { t: 104, text: "Or the moment of truth in your lies" },
+            { t: 111, text: "When everything feels like the movies" },
+            { t: 118, text: "Yeah, you bleed just to know you're alive" },
+            { t: 125, text: "And I don't want the world to see me" },
+            { t: 129, text: "Cause I don't think that they'd understand" },
+            { t: 139, text: "When everything's made to be broken" },
+            { t: 143, text: "I just want you to know who I am" },
+            { t: 153, text: "..." },
+            { t: 210, text: "And I don't want the world to see me" },
+            { t: 214, text: "Cause I don't think that they'd understand" },
+            { t: 224, text: "When everything's made to be broken" },
+            { t: 228, text: "I just want you to know who I am" },
+            { t: 238, text: "I just want you to know who I am" },
+            { t: 245, text: "I just want you to know who I am" },
+            { t: 252, text: "I just want you to know who I am..." }
+        ];
+
+        // ==========================================
+        // 2. PLAYER LOGIC
+        // ==========================================
+        let player;
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('yt-player', {
+                height: '0', width: '0',
+                videoId: 'xK4ZqrLys_k',
+                playerVars: { 'autoplay': 0, 'loop': 1, 'controls': 0, 'playlist': 'xK4ZqrLys_k' },
+                events: {
+                    'onStateChange': (e) => { if (e.data === YT.PlayerState.ENDED) player.playVideo(); }
+                }
+            });
+        }
+
+        // ==========================================
+        // 3. PHYSICS ENGINE (FIXED GALAXY STRUCTURE)
+        // ==========================================
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+        let isHandsReady = false; 
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            initParticles();
+        });
+
+        let particles = [];
+        const particleCount = 3500; 
+        let currentMode = 'GALAXY_SPIRAL'; 
+        let currentHandLandmarks = []; 
+        let pointerX = width / 2, pointerY = height / 2;
+
+        class Particle {
+            constructor() { this.init(); this.x = Math.random()*width; this.y = Math.random()*height; }
+            init() {
+                this.type = Math.random() > 0.94 ? 'PLANET' : 'STAR';
+                this.size = this.type === 'PLANET' ? Math.random()*4 + 2.5 : Math.random()*1.2 + 0.3;
+                const planetColors = ['#ffd700','#00ffff','#ff007f','#ffa500','#ffffff'];
+                this.color = this.type === 'PLANET' ? planetColors[Math.floor(Math.random()*planetColors.length)] : '#ffffff';
+                
+                // IMPROVED GALAXY DISTRIBUTION
+                this.r = Math.pow(Math.random(), 1.5) * Math.max(width, height) * 0.9;
+                const armCount = 2;
+                const armIndex = Math.floor(Math.random() * armCount);
+                // Menambah scatter agar tidak hanya terlihat 4 garis tipis
+                const scatter = (Math.random() - 0.5) * (this.r * 0.4 + 50);
+                this.baseA = (armIndex * (Math.PI * 2 / armCount)) + (this.r * 0.003) + (Math.random() * 0.5);
+                
+                this.bhZone = Math.random(); 
+                this.t = Math.PI * 2 * Math.random();
+                const hx = 16 * Math.pow(Math.sin(this.t), 3);
+                const hy = 13 * Math.cos(this.t) - 5 * Math.cos(2 * this.t) - 2 * Math.cos(3 * this.t) - Math.cos(4 * this.t);
+                const scale = Math.min(width, height)/20; // Hati lebih tebal (scale diperbesar)
+                this.heartX = (width / 2) + (hx * scale);
+                this.heartY = (height / 2) - (hy * scale);
+                this.loveOffset = (Math.random()-0.5)*60; // Spread hati lebih tebal
+                
+                this.metX = -(25 + Math.random()*30); 
+                this.metY = (15 + Math.random()*25);
+            }
+            update(time, mode) {
+                if (!isFinite(this.x)) this.x = Math.random() * width;
+                let tx = this.x, ty = this.y, lerp = 0.05;
+
+                switch(mode) {
+                    case 'ANTIGRAVITY':
+                        this.y -= 1.8; if (this.y < -50) this.y = height + 50;
+                        const dax = this.x - pointerX, day = this.y - pointerY;
+                        if (Math.hypot(dax, day) < 220) { this.x += (dax/12); this.y += (day/12); }
+                        return;
+                    case 'BLACK_HOLE': 
+                        if(this.type === 'PLANET'){
+                            const a = time*6 + this.baseA; const rDist = 120 + Math.random()*280;
+                            // ACCRETION DISK FORMATION (As per your Interstellar image)
+                            if(this.bhZone < 0.75){ tx = pointerX + Math.cos(a)*rDist; ty = pointerY + Math.sin(a)*(rDist*0.22); }
+                            else { tx = pointerX + Math.cos(a)*rDist; ty = pointerY + (this.bhZone>0.88?1:-1)*Math.abs(Math.sin(a))*rDist*0.85; }
+                            lerp = 0.18;
+                        } else { 
+                            // Background stars stay in galaxy
+                            tx = width/2 + Math.cos(this.baseA + time*0.05)*this.r; ty = height/2 + Math.sin(this.baseA + time*0.05)*this.r; 
+                        }
+                        break;
+                    case 'METEOR_SHOWER': 
+                        if(this.type === 'PLANET'){ 
+                            this.x+=this.metX; this.y+=this.metY; 
+                            if(this.x<-100||this.y>height+100){this.x=Math.random()*(width+500);this.y=-Math.random()*300;} 
+                            return; 
+                        } else { tx = width/2 + Math.cos(this.baseA)*this.r; ty = height/2 + Math.sin(this.baseA)*this.r; }
+                        break;
+                    case 'SECRET_HEART': tx = this.heartX + this.loveOffset; ty = this.heartY + this.loveOffset; lerp = 0.15; break;
+                    case 'DNA_HELIX': 
+                        const dX = (this.baseA * 100 + time * 200) % width;
+                        tx = dX; ty = (height/2) + Math.sin(dX * 0.01 + time * 2) * 180 * (this.baseA > Math.PI ? 1 : -1);
+                        lerp = 0.1; break;
+                    case 'COMET': tx = pointerX + Math.cos(this.baseA + time*15)*40; ty = pointerY + Math.sin(this.baseA+time*15)*40; lerp = 0.28; break;
+                    default: 
+                        // FULL GALAXY SPIRAL
+                        const angle = this.baseA + time * 0.1;
+                        tx = width/2 + Math.cos(angle)*this.r; 
+                        ty = height/2 + Math.sin(angle)*this.r;
+                }
+                this.x += (tx - this.x) * lerp; this.y += (ty - this.y) * lerp;
+            }
+            draw(mode) {
+                if(!isFinite(this.x)) return;
+                if(mode==='METEOR_SHOWER'&&this.type==='PLANET'){
+                    ctx.globalCompositeOperation = 'lighter';
+                    const g = ctx.createLinearGradient(this.x,this.y,this.x-this.metX*4,this.y-this.metY*4);
+                    g.addColorStop(0,'#fff'); g.addColorStop(1,'transparent');
+                    ctx.strokeStyle=g; ctx.lineWidth=this.size; ctx.beginPath(); ctx.moveTo(this.x,this.y); ctx.lineTo(this.x-this.metX*4,this.y-this.metY*4); ctx.stroke();
+                }
+                if(this.type==='PLANET'){
+                    ctx.globalCompositeOperation = (mode==='SECRET_HEART')?'lighter':'source-over';
+                    let g = ctx.createRadialGradient(this.x-this.size*0.3, this.y-this.size*0.3, 0, this.x, this.y, this.size);
+                    g.addColorStop(0,'#fff'); g.addColorStop(0.4,this.color); g.addColorStop(1,'rgba(0,0,0,0.8)');
+                    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(this.x,this.y,this.size,0,Math.PI*2); ctx.fill();
+                } else { ctx.globalCompositeOperation='lighter'; ctx.fillStyle=this.color; ctx.beginPath(); ctx.arc(this.x,this.y,this.size,0,Math.PI*2); ctx.fill(); }
+            }
+        }
+        function initParticles(){ particles=[]; for(let i=0;i<particleCount;i++) particles.push(new Particle()); }
+        initParticles();
+
+        // ==========================================
+        // 4. AI & INTERACTION (FIXED GHOST LOVE)
+        // ==========================================
+        const videoFocus = document.getElementById('video-focus'), videoBg = document.getElementById('video-bg');
+        const statusBox = document.getElementById('status-box'), lirikEl = document.getElementById('lyrics-text');
+        const uiLayer = document.getElementById('ui-layer');
+        let stableFingers = 0, heartHold = 0, votes = [];
+
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.35, minTrackingConfidence: 0.6 });
+        
+        hands.onResults((res) => {
+            currentHandLandmarks = res.multiHandLandmarks || [];
+            if(currentHandLandmarks.length > 0){
+                let raw = 0, isL = false;
+                const h0 = currentHandLandmarks[0];
+                // Focus center on index tip (pointer)
+                if(h0[8]){ pointerX = (1-h0[8].x)*width; pointerY = h0[8].y*height; }
+                
+                // PRECISE SWAN NECK DETECTION
+                if(currentHandLandmarks.length===2){
+                    const h1=currentHandLandmarks[0], h2=currentHandLandmarks[1];
+                    const distWrist = Math.hypot(h1[0].x-h2[0].x, h1[0].y-h2[0].y);
+                    const distMiddle = Math.hypot(h1[12].x-h2[12].x, h1[12].y-h2[12].y);
+                    // ADDED: Check orientation (Middle fingers must be higher than wrists)
+                    const isUpright = (h1[12].y < h1[0].y - 0.1) && (h2[12].y < h2[0].y - 0.1);
+                    if(distWrist < 0.35 && distMiddle < 0.35 && isUpright) isL = true;
+                }
+                
+                if(isL) heartHold++; else heartHold = Math.max(0, heartHold-1);
+
+                if(heartHold > 12){ 
+                    currentMode = 'SECRET_HEART'; uiLayer.classList.add('show'); statusBox.innerHTML = "🦢 LOVE FOR REVANI ❤️"; 
+                } else {
+                    uiLayer.classList.remove('show');
+                    currentHandLandmarks.forEach((lm, i) => {
+                        const side = res.multiHandedness[i].label;
+                        [8,12,16,20].forEach(t => { if(lm[t].y < lm[t-2].y) raw++; });
+                        if(side==="Left"?lm[4].x > lm[3].x : lm[4].x < lm[3].x) raw++;
+                    });
+                    votes.push(Math.min(raw,10)); if(votes.length>12) votes.shift();
+                    let c={}; votes.forEach(v => c[v]=(c[v]||0)+1);
+                    let max=0, best=stableFingers; for(let v in c){ if(c[v]>max){max=c[v];best=parseInt(v);} }
+                    stableFingers = best;
+                    const ms = ['ANTIGRAVITY','COMET','DNA_HELIX','INFINITY_LOOP','WORMHOLE','GALAXY_SPIRAL','METEOR_SHOWER','SATURN_RINGS','BLACK_HOLE','NEBULA_CLOUD','SUPERNOVA'];
+                    currentMode = ms[stableFingers] || 'GALAXY_SPIRAL';
+                    statusBox.innerHTML = `${currentMode.replace('_',' ')} (${stableFingers} Jari)`;
+                }
+            } else { currentMode = 'GALAXY_SPIRAL'; uiLayer.classList.remove('show'); statusBox.innerHTML = "🔍 Mencari Tangan..."; }
+        });
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            document.getElementById('overlay').style.display = 'none';
+            if(player && player.playVideo){ player.unMute(); player.playVideo(); }
+            startCam();
+        });
+
+        async function startCam() {
+            try {
+                const s = await navigator.mediaDevices.getUserMedia({video:{width:640,height:480}});
+                videoBg.srcObject = s; videoFocus.srcObject = s;
+                videoBg.onloadedmetadata = async () => {
+                    videoBg.play(); videoFocus.play();
+                    await hands.initialize(); isHandsReady = true; statusBox.innerHTML = "🚀 SEMESTA AKTIF!"; animate(); processAI();
+                };
+            } catch(e) { statusBox.innerHTML = "❌ Izin Kamera Ditolak"; }
+        }
+
+        async function processAI() { if(isHandsReady && videoFocus.readyState>=2) await hands.send({image:videoFocus}); requestAnimationFrame(processAI); }
+
+        function animate() {
+            ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(0,0,width,height);
+            ctx.globalCompositeOperation = 'source-over';
+            
+            // DRAW BLACK HOLE ACCRETION DISK EFFECT
+            if(currentMode === 'BLACK_HOLE'){
+                ctx.shadowBlur=50; ctx.shadowColor="#ffaa00"; 
+                ctx.fillStyle='rgba(255,140,0,0.25)'; ctx.beginPath(); 
+                ctx.ellipse(pointerX,pointerY,170,45,0,0,Math.PI*2); ctx.fill();
+                ctx.shadowBlur=0; ctx.fillStyle='#000'; ctx.beginPath(); 
+                ctx.arc(pointerX,pointerY,60,0,Math.PI*2); ctx.fill();
+            }
+
+            particles.forEach(p => { p.update(Date.now()*0.001, currentMode); p.draw(currentMode); });
+            
+            // DUAL HAND SKELETON
+            if (currentHandLandmarks.length > 0) {
+                currentHandLandmarks.forEach((lm, idx) => {
+                    ctx.strokeStyle = idx === 0 ? 'rgba(0, 255, 255, 0.5)' : 'rgba(255, 0, 255, 0.5)'; 
+                    ctx.lineWidth = 3;
+                    const drawLine = (p1, p2) => { 
+                        if (p1 && p2) {
+                            ctx.beginPath(); ctx.moveTo((1-p1.x)*width, p1.y*height); 
+                            ctx.lineTo((1-p2.x)*width, p2.y*height); ctx.stroke(); 
+                        }
+                    };
+                    const c = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+                    c.forEach(n => drawLine(lm[n[0]], lm[n[1]]));
+                });
+            }
+
+            if(player && player.getCurrentTime){
+                const ct = player.getCurrentTime();
+                const active = lyricsData.filter(l => l.t <= ct).pop();
+                if(active && lirikEl.innerText !== active.text){
+                    lirikEl.classList.remove('active');
+                    setTimeout(() => { lirikEl.innerText = active.text; lirikEl.classList.add('active'); }, 50);
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+    </script>
+</body>
+</html>
